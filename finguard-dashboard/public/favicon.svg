@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The same shield as the rail mark, at favicon weight. Uses currentColor-free
+       explicit fills because a favicon has no page to inherit from. -->
+  <rect width="32" height="32" rx="7" fill="#2F3F9E"/>
+  <path d="M16 6.5 8.5 9.6v6.6c0 5 3.2 8.9 7.5 10.6 4.3-1.7 7.5-5.6 7.5-10.6V9.6L16 6.5Z"
+        fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linejoin="round"/>
+  <!-- Three payers converging on one account: the mule ring, as a mark. -->
+  <circle cx="16" cy="19" r="2.1" fill="#FFFFFF"/>
+  <path d="M11.8 12.6 15 17.3M16 11.6v5.3M20.2 12.6 17 17.3"
+        stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" opacity="0.75"/>
+</svg>

@@ -1,0 +1,357 @@
+import { useMemo, useState } from 'react';
+import type { TransactionInput, ValidationErrors } from '../types';
+import {
+  validateVPA,
+  validateAmount,
+  validateVpaAge,
+  validateTimestamp,
+  validateGapSeconds,
+} from '../utils/validation';
+import {
+  buildScenarios,
+  toTransactionInput,
+  EMPTY_FORM,
+  type FormValues,
+  type Scenario,
+} from '../utils/scenarios';
+
+interface TransactionSimulatorProps {
+  onSimulate: (data: TransactionInput) => Promise<void>;
+  isLoading: boolean;
+}
+
+const FIELD_CLASS = 'nb-input';
+const LABEL_CLASS = 'nb-label block';
+
+export function TransactionSimulator({ onSimulate, isLoading }: TransactionSimulatorProps) {
+  const [formData, setFormData] = useState<FormValues>(EMPTY_FORM);
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [runningStep, setRunningStep] = useState<string | null>(null);
+
+  // Presets are built once per mount: each one stamps today's date at a fixed hour,
+  // so rebuilding them on every render would churn the timestamps for no reason.
+  const scenarios = useMemo(() => buildScenarios(), []);
+
+  const validateForm = (values: FormValues) => {
+    const next: ValidationErrors = {};
+
+    if (!validateVPA(values.senderVPA)) {
+      next.senderVPA = 'Sender VPA must look like name@handle (e.g. user@ybl)';
+    }
+    if (!validateVPA(values.receiverVPA)) {
+      next.receiverVPA = 'Receiver VPA must look like name@handle (e.g. merchant@paytm)';
+    }
+    if (!validateAmount(values.amount)) {
+      next.amount = 'Amount must be a positive number';
+    }
+    if (!validateVpaAge(values.receiverVpaAgeDays)) {
+      next.receiverVpaAgeDays = 'Enter a whole number of days between 0 and 1000';
+    }
+    if (!validateTimestamp(values.timestamp)) {
+      next.timestamp = 'Enter a valid date and time, or leave blank to use the server clock';
+    }
+    if (!validateGapSeconds(values.timeSinceLastTxnSec)) {
+      next.timeSinceLastTxnSec = 'Enter seconds as a number, or -1 for no prior activity';
+    }
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading || !validateForm(formData)) return;
+    await onSimulate(toTransactionInput(formData));
+  };
+
+  /**
+   * Fill the form from a preset and fire its legs in order.
+   *
+   * Sequential awaits matter for the Rs.1 test: the second leg is only interesting
+   * because the API has already recorded the first, and the backward-looking features
+   * read that history. Firing both at once would race, and the drain would be scored
+   * as though the probe had never happened.
+   */
+  const runScenario = async (scenario: Scenario) => {
+    if (isLoading) return;
+    setErrors({});
+
+    for (const step of scenario.steps) {
+      setFormData(step.values);
+      setRunningStep(step.caption ?? null);
+      await onSimulate(toTransactionInput(step.values));
+    }
+    setRunningStep(null);
+  };
+
+  const update = (field: keyof FormValues, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field as keyof ValidationErrors]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const isFormValid =
+    validateVPA(formData.senderVPA) &&
+    validateVPA(formData.receiverVPA) &&
+    validateAmount(formData.amount) &&
+    validateVpaAge(formData.receiverVpaAgeDays) &&
+    validateTimestamp(formData.timestamp) &&
+    validateGapSeconds(formData.timeSinceLastTxnSec);
+
+  const fieldError = (key: keyof ValidationErrors, id: string) =>
+    errors[key] ? (
+      <span id={`${id}-error`} className="text-[var(--hold)] text-sm mt-1 block" role="alert">
+        {errors[key]}
+      </span>
+    ) : null;
+
+  return (
+    <div className="nb-panel" style={{ padding: 20 }}>
+      <h2 className="nb-display" style={{ fontSize: 17, marginBottom: 3 }}>Transaction Simulator</h2>
+      <p className="text-sm text-[var(--muted)] mb-5">
+        Score a payment against the live model, or replay one of the scam signatures it
+        was trained to catch.
+      </p>
+
+      {/* Scenario presets ------------------------------------------------ */}
+      <fieldset className="mb-6" disabled={isLoading}>
+        <legend className="nb-label" style={{ marginBottom: 8 }}>
+          Replay a signature
+        </legend>
+        {/* Two columns rather than flex-wrap: four presets wrapped 3-then-1 and left a
+            ragged gap under the last row. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {scenarios.map((scenario) => (
+            <button
+              key={scenario.id}
+              type="button"
+              onClick={() => void runScenario(scenario)}
+              disabled={isLoading}
+              title={scenario.blurb}
+              className="nb-btn flex items-center gap-2"
+              style={{ justifyContent: 'flex-start', textAlign: 'left' }}
+            >
+              {/* These used to be filled solid in --hold-fill, which put the colour that
+                  means "this payment was held" onto a control that only loads a form.
+                  The swatch carries the same information without spending the semantic
+                  on chrome — and matches how the cost table marks an action. */}
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  flexShrink: 0,
+                  background: scenario.hostile ? 'var(--hold-fill)' : 'var(--accept-fill)',
+                  border: '1px solid var(--ink)',
+                }}
+                aria-hidden="true"
+              />
+              <span style={{ minWidth: 0 }}>{scenario.label}</span>
+              <span className="sr-only">
+                {scenario.hostile ? ' — scam signature' : ' — legitimate payment'}
+              </span>
+            </button>
+          ))}
+        </div>
+        {runningStep && (
+          <p className="text-xs text-[var(--accent)] mt-2" aria-live="polite">
+            Running {runningStep}
+          </p>
+        )}
+      </fieldset>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label style={{ marginBottom: 5 }} className={LABEL_CLASS} htmlFor="senderVPA">Sender VPA</label>
+          <input
+            id="senderVPA"
+            type="text"
+            value={formData.senderVPA}
+            onChange={(e) => update('senderVPA', e.target.value)}
+            placeholder="user@ybl"
+            className={FIELD_CLASS}
+            disabled={isLoading}
+            aria-describedby={errors.senderVPA ? 'senderVPA-error' : undefined}
+          />
+          {fieldError('senderVPA', 'senderVPA')}
+        </div>
+
+        <div>
+          <label style={{ marginBottom: 5 }} className={LABEL_CLASS} htmlFor="receiverVPA">Receiver VPA</label>
+          <input
+            id="receiverVPA"
+            type="text"
+            value={formData.receiverVPA}
+            onChange={(e) => update('receiverVPA', e.target.value)}
+            placeholder="merchant@paytm"
+            className={FIELD_CLASS}
+            disabled={isLoading}
+            aria-describedby={errors.receiverVPA ? 'receiverVPA-error' : undefined}
+          />
+          {fieldError('receiverVPA', 'receiverVPA')}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label style={{ marginBottom: 5 }} className={LABEL_CLASS} htmlFor="amount">Amount (INR)</label>
+            <input
+              id="amount"
+              type="number"
+              value={formData.amount}
+              onChange={(e) => update('amount', e.target.value)}
+              placeholder="500"
+              min="0"
+              step="0.01"
+              className={FIELD_CLASS}
+              disabled={isLoading}
+              aria-describedby={errors.amount ? 'amount-error' : undefined}
+            />
+            {fieldError('amount', 'amount')}
+          </div>
+
+          <div>
+            <label style={{ marginBottom: 5 }} className={LABEL_CLASS} htmlFor="receiverVpaAgeDays">
+              Receiver VPA age (days)
+              <span className="text-[var(--faint)] font-normal"> &mdash; optional</span>
+            </label>
+            <input
+              id="receiverVpaAgeDays"
+              type="number"
+              value={formData.receiverVpaAgeDays}
+              onChange={(e) => update('receiverVpaAgeDays', e.target.value)}
+              placeholder="0 for a brand-new account"
+              min="0"
+              max="1000"
+              step="1"
+              className={FIELD_CLASS}
+              disabled={isLoading}
+              aria-describedby={
+                errors.receiverVpaAgeDays ? 'receiverVpaAgeDays-error' : 'receiverVpaAgeDays-help'
+              }
+            />
+            {errors.receiverVpaAgeDays ? (
+              fieldError('receiverVpaAgeDays', 'receiverVpaAgeDays')
+            ) : (
+              <span id="receiverVpaAgeDays-help" className="text-[var(--faint)] text-xs mt-1 block">
+                The strongest single signal in the model. Left blank, the engine assumes an
+                established account and approves almost anything.
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label style={{ marginBottom: 5 }} className={LABEL_CLASS} htmlFor="timestamp">
+            Transaction time
+            <span className="text-[var(--faint)] font-normal"> &mdash; optional</span>
+          </label>
+          <input
+            id="timestamp"
+            type="datetime-local"
+            // Without this the control's step is 60s and it silently drops the seconds
+            // component of any value set on it.
+            step="1"
+            value={formData.timestamp}
+            onChange={(e) => update('timestamp', e.target.value)}
+            className={FIELD_CLASS}
+            disabled={isLoading}
+            aria-describedby={errors.timestamp ? 'timestamp-error' : 'timestamp-help'}
+          />
+          {errors.timestamp ? (
+            fieldError('timestamp', 'timestamp')
+          ) : (
+            <span id="timestamp-help" className="text-[var(--faint)] text-xs mt-1 block">
+              Set an hour between 01:00 and 04:00 to reach the odd-hour phishing signature.
+              Blank uses the server clock.
+            </span>
+          )}
+        </div>
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="text-xs text-[var(--muted)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-1 py-0.5"
+            aria-expanded={showAdvanced}
+            aria-controls="advanced-fields"
+          >
+            {showAdvanced ? 'Hide' : 'Show'} sender context
+          </button>
+
+          {showAdvanced && (
+            <div id="advanced-fields" className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+              <div>
+                <label style={{ marginBottom: 5 }} className={LABEL_CLASS} htmlFor="senderCity">Sender city</label>
+                <input
+                  id="senderCity"
+                  type="text"
+                  value={formData.senderCity}
+                  onChange={(e) => update('senderCity', e.target.value)}
+                  placeholder="Mumbai"
+                  maxLength={64}
+                  className={FIELD_CLASS}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div>
+                <label style={{ marginBottom: 5 }} className={LABEL_CLASS} htmlFor="timeSinceLastTxnSec">
+                  Seconds since last payment
+                </label>
+                <input
+                  id="timeSinceLastTxnSec"
+                  type="number"
+                  value={formData.timeSinceLastTxnSec}
+                  onChange={(e) => update('timeSinceLastTxnSec', e.target.value)}
+                  placeholder="-1 if none"
+                  step="1"
+                  className={FIELD_CLASS}
+                  disabled={isLoading}
+                  aria-describedby={
+                    errors.timeSinceLastTxnSec ? 'timeSinceLastTxnSec-error' : 'gap-help'
+                  }
+                />
+                {errors.timeSinceLastTxnSec ? (
+                  fieldError('timeSinceLastTxnSec', 'timeSinceLastTxnSec')
+                ) : (
+                  <span id="gap-help" className="text-[var(--faint)] text-xs mt-1 block">
+                    Overrides the server-side history lookup.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={!isFormValid || isLoading}
+          className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--ink)] font-medium py-2 px-4 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2"
+          title={!isFormValid ? 'Fill sender, receiver and amount to continue' : undefined}
+        >
+          {isLoading ? (
+            <span className="flex items-center justify-center">
+              <svg
+                className="animate-spin"
+                style={{ width: 16, height: 16, marginRight: 9 }}
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                {/* 2px stroke, square cap — the same grid as every other glyph here.
+                    Tailwind's stock spinner is a 4px-stroke filled arc and sat visibly
+                    heavier than the icon set beside it. */}
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" />
+              </svg>
+              Scoring...
+            </span>
+          ) : (
+            'Score transaction'
+          )}
+        </button>
+      </form>
+    </div>
+  );
+}

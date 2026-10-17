@@ -1,0 +1,460 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   FinGuard — neobrutalist console
+
+   Two rules hold this together.
+
+   1. No component may name a colour. Everything resolves through a token, which
+      is what lets a second theme exist without the first one rotting the next
+      time somebody adds a panel.
+
+   2. Solid surfaces for content, glass only for what floats. Neobrutalism is
+      flat poster-like impact; glassmorphism is the space between objects. They
+      are opposites, and mixing them arbitrarily makes mush. Chrome and cards are
+      solid and bordered; the top bar, drawers, tooltips and toasts are glass.
+      Nothing else.
+
+   A note on restraint, because this style earns its reputation for being
+   unusable when it is applied evenly: the boldness lives on chrome, actions and
+   status. Tables and charts stay quiet. A 25-row alert queue with a 2px border
+   on every cell cannot be scanned, and scanning it is the job.
+   ========================================================================== */
+
+@theme {
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Archivo', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Ground has to be warm. Cool grey kills neobrutalism — it reads as the safe
+     corporate default the style exists to reject. */
+  --paper: #fbf7ed;
+  --surface: #ffffff;
+  --sunk: #f2ece0;
+  --raised: #ffffff;
+
+  /* Ink is text *and* border. One value, so a border can never drift out of step
+     with the type sitting inside it. */
+  --ink: #0b0b0b;
+  --muted: #55524b;
+  --faint: #736e65;
+
+  /* One decorative accent. NN/g caps bold colours at two or three; the semantic
+     trio below carries meaning rather than decoration and is counted apart. */
+  --accent: #1b3bea;
+  --accent-hover: #1530c4;
+  --accent-soft: #1b3bea18;
+  --accent-ink: #ffffff;
+
+  /* Each semantic is a pair: a vivid `-fill` for blocks and bars, and a darker
+     text-safe value for anything you actually read. Auditing the vivid versions
+     as foreground is where this palette first failed - jade came in at 3.08:1
+     and marigold at 3.64:1 against white, both short of 4.5. Large fills only
+     need 3:1, so splitting the roles keeps the colour and passes the check. */
+  --accept: #00734a;
+  --accept-fill: #00a86b;
+  --accept-soft: #00a86b1f;
+  --challenge: #8a5a00;
+  --challenge-fill: #ffb302;
+  --challenge-soft: #ffb3022e;
+  --hold: #c9271e;
+  --hold-fill: #ff3b30;
+  --hold-soft: #ff3b3021;
+
+  /* SHAP diverging pair, tuned per theme rather than reused. */
+  --shap-risk: #ff3b30;
+  --shap-safe: #00a86b;
+
+  --node-victim: #55524b;
+  --node-mule: #c9271e;
+  --edge: #cbc4b4;
+
+  /* Brutalist primitives. The shadow is a hard offset with no blur — that single
+     property is most of the style. */
+  --border-w: 2px;
+  --border: var(--border-w) solid var(--ink);
+  --shadow-hard: 4px 4px 0 var(--ink);
+  --shadow-hard-sm: 2px 2px 0 var(--ink);
+  --shadow-hard-lg: 6px 6px 0 var(--ink);
+  --radius: 4px;
+  --radius-sm: 3px;
+
+  /* Glass, for the floating layer only. */
+  --glass-bg: color-mix(in srgb, var(--surface) 74%, transparent);
+  --glass-border: color-mix(in srgb, var(--ink) 16%, transparent);
+  --glass-blur: blur(14px) saturate(140%);
+
+  /* Motion. Defined once so timing cannot drift between components. */
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* System preference, only when no explicit choice was made. Guarded so an
+   explicit light choice still beats a dark OS. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --paper: #12120f;
+    --surface: #1b1b17;
+    --sunk: #24241f;
+    --raised: #26261f;
+
+    /* Ink inverts to a warm off-white — borders stay maximum contrast, which is
+       what keeps the style legible rather than merely dark. */
+    --ink: #f6f2e7;
+    --muted: #b3ac9d;
+    --faint: #8a8477;
+
+    --accent: #6f8cff;
+    --accent-hover: #8aa1ff;
+    --accent-soft: #6f8cff26;
+    --accent-ink: #12120f;
+
+    --accept: #2fd48f;
+    --accept-fill: #2fd48f;
+    --accept-soft: #2fd48f26;
+    --challenge: #ffc53d;
+    --challenge-fill: #ffc53d;
+    --challenge-soft: #ffc53d26;
+    --hold: #ff6b5f;
+    --hold-fill: #ff6b5f;
+    --hold-soft: #ff6b5f26;
+
+    --shap-risk: #ff6b5f;
+    --shap-safe: #2fd48f;
+
+    --node-victim: #b3ac9d;
+    --node-mule: #ff6b5f;
+    --edge: #4a473e;
+
+    --glass-bg: color-mix(in srgb, var(--surface) 68%, transparent);
+    --glass-border: color-mix(in srgb, var(--ink) 20%, transparent);
+  }
+}
+
+/* Explicit choice wins in both directions. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --paper: #12120f;
+  --surface: #1b1b17;
+  --sunk: #24241f;
+  --raised: #26261f;
+
+  --ink: #f6f2e7;
+  --muted: #b3ac9d;
+  --faint: #8a8477;
+
+  --accent: #6f8cff;
+  --accent-hover: #8aa1ff;
+  --accent-soft: #6f8cff26;
+  --accent-ink: #12120f;
+
+  --accept: #2fd48f;
+  --accept-fill: #2fd48f;
+  --accept-soft: #2fd48f26;
+  --challenge: #ffc53d;
+  --challenge-fill: #ffc53d;
+  --challenge-soft: #ffc53d26;
+  --hold: #ff6b5f;
+  --hold-fill: #ff6b5f;
+  --hold-soft: #ff6b5f26;
+
+  --shap-risk: #ff6b5f;
+  --shap-safe: #2fd48f;
+
+  --node-victim: #b3ac9d;
+  --node-mule: #ff6b5f;
+  --edge: #4a473e;
+
+  --glass-bg: color-mix(in srgb, var(--surface) 68%, transparent);
+  --glass-border: color-mix(in srgb, var(--ink) 20%, transparent);
+}
+
+@layer base {
+  html {
+    /* Stamped by the inline script in index.html before first paint, so a
+       dark-mode viewer never gets a cream flash while the bundle loads. */
+    background: var(--paper);
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* Digits align in columns everywhere here — amounts, probabilities, latencies.
+     Proportional figures make a table impossible to scan. */
+  table,
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Neobrutalism's documented failure is interactive elements becoming
+     unrecognisable. Focus is therefore loud and identical everywhere. */
+  :focus-visible {
+    outline: var(--border-w) solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--challenge-fill);
+    color: #0b0b0b;
+  }
+}
+
+@layer components {
+  /* ---- surfaces ---- */
+  .nb-panel {
+    background: var(--surface);
+    border: var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-hard);
+  }
+
+  .nb-panel-flat {
+    background: var(--surface);
+    border: var(--border);
+    border-radius: var(--radius);
+  }
+
+  /* The floating layer. Only the top bar, drawers, tooltips and toasts. */
+  .nb-glass {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: var(--border-w) solid var(--glass-border);
+  }
+
+  /* ---- type ---- */
+  .nb-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  .nb-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .nb-display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+
+  /* ---- controls ---- */
+  /* The signature interaction: pressing translates the control into its own
+     shadow. Tactile, unmistakable, and the direct answer to neobrutalism's
+     habit of leaving you unsure whether a thing is clickable. */
+  .nb-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    color: var(--ink);
+    background: var(--surface);
+    border: var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-hard-sm);
+    cursor: pointer;
+    transition:
+      transform var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+  }
+  .nb-btn:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: var(--shadow-hard);
+  }
+  .nb-btn:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 var(--ink);
+  }
+  .nb-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .nb-btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .nb-btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .nb-btn-danger {
+    background: var(--hold-fill);
+    color: #0b0b0b;
+  }
+
+  .nb-input {
+    width: 100%;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    padding: 9px 11px;
+    color: var(--ink);
+    background: var(--surface);
+    border: var(--border);
+    border-radius: var(--radius-sm);
+    transition:
+      box-shadow var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+  }
+  .nb-input::placeholder {
+    color: var(--faint);
+  }
+  .nb-input:hover:not(:disabled) {
+    box-shadow: var(--shadow-hard-sm);
+  }
+  .nb-input:focus {
+    outline: none;
+    box-shadow: var(--shadow-hard-sm);
+    transform: translate(-1px, -1px);
+    border-color: var(--accent);
+  }
+  .nb-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ---- badges ---- */
+  .nb-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 3px 9px;
+    border: var(--border);
+    border-radius: 999px;
+    color: #0b0b0b;
+  }
+
+  /* ---- skeleton ---- */
+  /* Structure before content: a shimmering block of the right shape reads as
+     "loading" far faster than a spinner reads as anything. */
+  .nb-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--sunk);
+    border: var(--border-w) solid var(--edge);
+    border-radius: var(--radius-sm);
+  }
+  .nb-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--ink) 7%, transparent),
+      transparent
+    );
+    animation: nb-shimmer 1.4s infinite;
+  }
+
+  /* The hatched fill used behind stat tiles, so a bold block still reads as a
+     surface rather than a slab of paint. */
+  .nb-hatch {
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 5px,
+      color-mix(in srgb, var(--ink) 5%, transparent) 5px,
+      color-mix(in srgb, var(--ink) 5%, transparent) 6px
+    );
+  }
+}
+
+@keyframes nb-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes nb-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Scrollbars belong to the palette, not the browser. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--edge) transparent;
+}
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--edge);
+  border: 3px solid var(--paper);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--faint);
+}
+
+/* Motion that cannot be turned off is an accessibility defect, not a flourish.
+   Framer Motion variants check `useReducedMotion` separately; this covers the
+   CSS half. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .nb-btn:hover:not(:disabled),
+  .nb-btn:active:not(:disabled),
+  .nb-input:focus {
+    transform: none;
+  }
+}
